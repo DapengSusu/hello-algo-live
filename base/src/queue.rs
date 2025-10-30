@@ -51,14 +51,25 @@ impl<T: Clone> QueueWithList<T> {
 
 /// 基于数组实现的队列
 #[derive(Debug, Clone)]
-pub struct QueueWithVec<T> {
-    queue: Vec<Option<T>>,
+pub struct QueueWithArray<T, const N: usize> {
+    queue: [Option<T>; N],
     front: usize,
     len: usize,
     cap: usize,
 }
 
-impl<T> QueueWithVec<T> {
+impl<T: Copy, const N: usize> Default for QueueWithArray<T, N> {
+    fn default() -> Self {
+        Self {
+            queue: [None; N],
+            front: 0,
+            len: 0,
+            cap: N,
+        }
+    }
+}
+
+impl<T, const N: usize> QueueWithArray<T, N> {
     pub fn push(&mut self, elem: T) {
         if self.len == self.cap {
             panic!("push failed, queue is full");
@@ -73,6 +84,7 @@ impl<T> QueueWithVec<T> {
         if self.is_empty() {
             return None;
         }
+
         let front = self.queue[self.front].take();
 
         self.front = (self.front + 1) % self.cap;
@@ -85,6 +97,7 @@ impl<T> QueueWithVec<T> {
         if self.is_empty() {
             return None;
         }
+
         self.queue[self.front].as_ref()
     }
 
@@ -92,6 +105,7 @@ impl<T> QueueWithVec<T> {
         if self.is_empty() {
             return None;
         }
+
         let real = (self.front + self.len) % self.cap;
 
         self.queue[real - 1].as_ref()
@@ -110,19 +124,19 @@ impl<T> QueueWithVec<T> {
     }
 }
 
-impl<T: Clone> QueueWithVec<T> {
-    pub fn with_cap(cap: usize) -> Self {
-        QueueWithVec {
-            queue: vec![None; cap],
+impl<T: Copy, const N: usize> QueueWithArray<T, N> {
+    pub fn new() -> Self {
+        QueueWithArray {
+            queue: [None; N],
             front: 0,
             len: 0,
-            cap,
+            cap: N,
         }
     }
 
     pub fn to_vec(&self) -> Vec<T> {
         (0..self.len)
-            .filter_map(|i| self.queue[(self.front + i) % self.cap].clone())
+            .filter_map(|i| self.queue[(self.front + i) % self.cap])
             .collect::<Vec<_>>()
     }
 }
@@ -159,7 +173,7 @@ mod tests {
 
     #[test]
     fn queue_with_vec_basics() {
-        let mut queue = QueueWithVec::<i32>::with_cap(5);
+        let mut queue = QueueWithArray::<i32, 5>::new();
 
         assert!(queue.is_empty());
         assert_eq!(queue.peek(), None);

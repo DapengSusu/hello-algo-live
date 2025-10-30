@@ -2,7 +2,7 @@ use colored::Colorize;
 use flexi_logger::Logger;
 
 mod queue;
-pub use queue::{QueueWithList, QueueWithVec};
+pub use queue::{QueueWithArray, QueueWithList};
 
 mod stack;
 pub use stack::{StackWithList, StackWithVec};
