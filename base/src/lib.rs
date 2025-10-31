@@ -1,6 +1,9 @@
 use colored::Colorize;
 use flexi_logger::Logger;
 
+mod linked_list;
+pub use linked_list::LinkedList;
+
 mod queue;
 pub use queue::{QueueWithArray, QueueWithList};
 
