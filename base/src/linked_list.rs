@@ -1,10 +1,25 @@
-use std::{fmt::Display, marker::PhantomData, ptr::NonNull};
+use std::{
+    fmt::{self, Display},
+    marker::PhantomData,
+    mem,
+    ptr::NonNull,
+};
 
 #[derive(Debug)]
 struct Node<T> {
     prev: Option<NonNull<Node<T>>>,
     next: Option<NonNull<Node<T>>>,
     elem: T,
+}
+
+impl<T: Default> Default for Node<T> {
+    fn default() -> Self {
+        Self {
+            prev: None,
+            next: None,
+            elem: T::default(),
+        }
+    }
 }
 
 impl<T: Display> Display for Node<T> {
@@ -16,7 +31,7 @@ impl<T: Display> Display for Node<T> {
     }
 }
 
-#[derive(Debug)]
+/// 简易链表实现
 pub struct LinkedList<T> {
     head: Option<NonNull<Node<T>>>,
     tail: Option<NonNull<Node<T>>>,
@@ -24,46 +39,60 @@ pub struct LinkedList<T> {
 }
 
 impl<T> LinkedList<T> {
+    /// 创建空链表
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            head: None,
+            tail: None,
+            len: 0,
+        }
     }
 
+    /// 向链表头部插入一个元素
     pub fn push_front(&mut self, t: T) {
         self.push(t, true);
     }
 
+    /// 向链表尾部插入一个元素
     pub fn push_back(&mut self, t: T) {
         self.push(t, false);
     }
 
+    /// 移除链表头部元素并将其返回
     pub fn pop_front(&mut self) -> Option<T> {
         self.pop(true)
     }
 
+    /// 移除链表尾部元素并将其返回
     pub fn pop_back(&mut self) -> Option<T> {
         self.pop(false)
     }
 
+    /// 返回链表头部元素的不可变借用
     pub fn front(&self) -> Option<&T> {
         self.head
             .map(|node_ptr| unsafe { &(*node_ptr.as_ptr()).elem })
     }
 
+    /// 返回链表尾部元素的不可变借用
     pub fn back(&self) -> Option<&T> {
         self.tail
             .map(|node_ptr| unsafe { &(*node_ptr.as_ptr()).elem })
     }
 
+    /// 返回链表头部元素的可变借用
     pub fn front_mut(&mut self) -> Option<&mut T> {
         self.head
             .map(|node_ptr| unsafe { &mut (*node_ptr.as_ptr()).elem })
     }
 
+    /// 返回链表尾部元素的可变借用
     pub fn back_mut(&mut self) -> Option<&mut T> {
         self.tail
             .map(|node_ptr| unsafe { &mut (*node_ptr.as_ptr()).elem })
     }
 
+    /// 返回不可变迭代器
     pub fn iter(&self) -> Iter<'_, T> {
         Iter {
             current: self.head,
@@ -71,6 +100,7 @@ impl<T> LinkedList<T> {
         }
     }
 
+    /// 返回可变的代器
     pub fn iter_mut(&mut self) -> IterMut<'_, T> {
         IterMut {
             current: self.head,
@@ -78,6 +108,7 @@ impl<T> LinkedList<T> {
         }
     }
 
+    /// 检查链表中是否包含指定元素，包含返回 true，否则返回 false
     pub fn contains(&self, t: &T) -> bool
     where
         T: PartialEq,
@@ -95,16 +126,53 @@ impl<T> LinkedList<T> {
         false
     }
 
+    /// 将链表反转
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use base::LinkedList;
+    ///
+    /// let mut list = LinkedList::from([2, 4, 6, 8, 0]);
+    ///
+    /// list.reverse();
+    /// assert_eq!(list, LinkedList::from([0, 8, 6, 4, 2]));
+    /// ```
+    pub fn reverse(&mut self) {
+        if self.len <= 1 {
+            return;
+        }
+
+        let mut current = self.head;
+        // 遍历所有结点，交换 next 和 prev
+        while let Some(node_ptr) = current {
+            let node_ptr_raw = node_ptr.as_ptr();
+
+            unsafe {
+                // 暂时保存当前结点的 next 结点
+                let node_next = (*node_ptr_raw).next;
+                // 交换 next 和 prev 指针
+                mem::swap(&mut (*node_ptr_raw).next, &mut (*node_ptr_raw).prev);
+                // 推进到下一结点
+                current = node_next;
+            }
+        }
+
+        // 交换链表的 head 和 tail 指针
+        mem::swap(&mut self.head, &mut self.tail);
+    }
+
+    /// 将链表转化为一个 Vec
     pub fn into_vec(self) -> Vec<T> {
         self.into_iter().collect()
     }
 
+    /// 清空链表内的全部元素
     pub fn clear(&mut self) {
         // 从链表头部开始，依次将裸指针转回 Box，触发 Box 的析构函数，从而安全释放内存。
 
         // 取出链表头指针。take() 将 self.head 置为 None，确保链表结构被清空。
         let mut current = self.head.take();
-
         // 遍历所有结点
         while let Some(node_ptr) = current {
             let node_ptr_raw = node_ptr.as_ptr();
@@ -124,20 +192,24 @@ impl<T> LinkedList<T> {
         self.len = 0;
     }
 
+    /// 从前往后获取指定位置元素的不可变借用，如果 index 无效返回 None
     pub fn get(&self, index: usize) -> Option<&T> {
         self.get_node(index)
             .map(|node_ptr| unsafe { &(*node_ptr.as_ptr()).elem })
     }
 
+    /// 从前往后获取指定位置元素的可变借用，如果 index 无效返回 None
     pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
         self.get_node(index)
             .map(|node_ptr| unsafe { &mut (*node_ptr.as_ptr()).elem })
     }
 
+    /// 返回链表中元素数量
     pub fn len(&self) -> usize {
         self.len
     }
 
+    /// 判断链表是否为空
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
@@ -242,13 +314,15 @@ impl<T> LinkedList<T> {
     }
 }
 
+impl<T: fmt::Debug> fmt::Debug for LinkedList<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self).finish()
+    }
+}
+
 impl<T> Default for LinkedList<T> {
     fn default() -> Self {
-        Self {
-            head: None,
-            tail: None,
-            len: 0,
-        }
+        Self::new()
     }
 }
 
@@ -261,9 +335,70 @@ impl<T: Display> Display for LinkedList<T> {
     }
 }
 
+impl<T: Clone> Clone for LinkedList<T> {
+    fn clone(&self) -> Self {
+        Self::from_iter(self.iter().cloned())
+    }
+}
+
 impl<T> Drop for LinkedList<T> {
     fn drop(&mut self) {
         self.clear();
+    }
+}
+
+impl<T: PartialEq> PartialEq for LinkedList<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.len() == other.len() && self.iter().eq(other)
+    }
+}
+
+impl<T: Eq> Eq for LinkedList<T> {}
+
+impl<T: PartialOrd> PartialOrd for LinkedList<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.iter().partial_cmp(other)
+    }
+}
+
+impl<T: Ord> Ord for LinkedList<T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.iter().cmp(other)
+    }
+}
+
+impl<T, const N: usize> From<[T; N]> for LinkedList<T> {
+    fn from(v: [T; N]) -> Self {
+        Self::from_iter(v)
+    }
+}
+
+impl<T> From<Vec<T>> for LinkedList<T> {
+    fn from(v: Vec<T>) -> Self {
+        Self::from_iter(v)
+    }
+}
+
+impl<T> FromIterator<T> for LinkedList<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let mut list = LinkedList::new();
+
+        list.extend(iter);
+        list
+    }
+}
+
+impl<T> Extend<T> for LinkedList<T> {
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        for item in iter {
+            self.push_back(item);
+        }
+    }
+}
+
+impl<'a, T: 'a + Copy> Extend<&'a T> for LinkedList<T> {
+    fn extend<I: IntoIterator<Item = &'a T>>(&mut self, iter: I) {
+        self.extend(iter.into_iter().cloned());
     }
 }
 
@@ -283,6 +418,24 @@ impl<T> Iterator for IntoIter<T> {
 impl<T> DoubleEndedIterator for IntoIter<T> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.list.pop_back()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a LinkedList<T> {
+    type Item = &'a T;
+    type IntoIter = Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a mut LinkedList<T> {
+    type Item = &'a mut T;
+    type IntoIter = IterMut<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
     }
 }
 
@@ -385,6 +538,10 @@ mod tests {
         assert_eq!(list.back(), None);
         assert_eq!(list.pop_front(), None);
         assert_eq!(list.pop_back(), None);
+
+        list.push_front(5);
+        assert_eq!(list.front(), Some(&5));
+        assert_eq!(list.back(), Some(&5));
     }
 
     #[test]
@@ -414,5 +571,14 @@ mod tests {
         assert_eq!(iter.next(), Some(3));
         assert_eq!(iter.next_back(), Some(7));
         assert_eq!(iter.next(), Some(5));
+    }
+
+    #[test]
+    fn list_reverse_should_work() {
+        let mut list = LinkedList::from([2, 4, 6, 8, 0]);
+
+        list.reverse();
+
+        assert_eq!(list, LinkedList::from([0, 8, 6, 4, 2]));
     }
 }
