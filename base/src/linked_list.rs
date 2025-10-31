@@ -162,6 +162,94 @@ impl<T> LinkedList<T> {
         mem::swap(&mut self.head, &mut self.tail);
     }
 
+    /// 将 other 中的全部元素移动到链表尾部，完成后 other 为空
+    pub fn append(&mut self, other: &mut Self) {
+        match self.tail {
+            None => mem::swap(self, other),
+            Some(mut tail_ptr) => {
+                if let Some(mut head_other) = other.head.take() {
+                    // 这里使用 `as_mut` 是可行的，因为我们拥有
+                    // 对两个链表全部内容的独占的访问权限
+                    unsafe {
+                        tail_ptr.as_mut().next = Some(head_other);
+                        head_other.as_mut().prev = Some(tail_ptr);
+                    }
+
+                    self.tail = other.tail.take();
+                    self.len += mem::replace(&mut other.len, 0);
+                }
+            }
+        }
+    }
+
+    /// 将链表从指定位置一分为二，返回 at 及 at 之后所有元素组成的新链表。
+    ///
+    /// # Panics
+    ///
+    /// Panics if `at > len`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use base::LinkedList;
+    ///
+    /// let mut list = LinkedList::from([2, 4, 6, 8, 0]);
+    /// let mut split = list.split_off(2);
+    ///
+    /// assert_eq!(split, LinkedList::from([6, 8, 0]));
+    /// ```
+    pub fn split_off(&mut self, at: usize) -> LinkedList<T> {
+        let len = self.len();
+
+        assert!(at <= len, "Cannot split off at a nonexistent index");
+        if at == 0 {
+            return mem::take(self);
+        } else if at == len {
+            return Self::new();
+        }
+
+        let split_node = {
+            let mut iter = self.iter_mut();
+            // 手动跳过前 at-1 个结点，不要使用 `.skip()`，避免依赖 Skip
+            for _ in 0..at - 1 {
+                iter.next();
+            }
+            iter.current
+        };
+
+        // split_node 是第一部分的新 tail 结点，它也包含第二部分的 head 结点。
+        if let Some(mut split_node) = split_node {
+            let second_part_head;
+            let second_part_tail;
+
+            unsafe {
+                second_part_head = split_node.as_mut().next.take();
+            }
+            if let Some(mut head) = second_part_head {
+                unsafe {
+                    head.as_mut().prev = None;
+                }
+                second_part_tail = self.tail;
+            } else {
+                second_part_tail = None;
+            }
+
+            let second_part = LinkedList {
+                head: second_part_head,
+                tail: second_part_tail,
+                len: self.len - at,
+            };
+
+            // 更新第一部分的 tail 指针
+            self.tail = Some(split_node);
+            self.len = at;
+
+            second_part
+        } else {
+            std::mem::take(self)
+        }
+    }
+
     /// 将链表转化为一个 Vec
     pub fn into_vec(self) -> Vec<T> {
         self.into_iter().collect()
@@ -233,14 +321,14 @@ impl<T> LinkedList<T> {
 
         if is_front {
             match self.head {
-                Some(head_ptr) => unsafe { (*head_ptr.as_ptr()).prev = node_ptr },
                 None => self.tail = node_ptr,
+                Some(head_ptr) => unsafe { (*head_ptr.as_ptr()).prev = node_ptr },
             }
             self.head = node_ptr;
         } else {
             match self.tail {
-                Some(tail_ptr) => unsafe { (*tail_ptr.as_ptr()).next = node_ptr },
                 None => self.head = node_ptr,
+                Some(tail_ptr) => unsafe { (*tail_ptr.as_ptr()).next = node_ptr },
             }
             self.tail = node_ptr;
         }
@@ -580,5 +668,29 @@ mod tests {
         list.reverse();
 
         assert_eq!(list, LinkedList::from([0, 8, 6, 4, 2]));
+    }
+
+    #[test]
+    fn list_append_should_work() {
+        let mut list = LinkedList::from([1, 2, 3]);
+        let mut list_src = LinkedList::from([5, 6, 7]);
+
+        list.append(&mut list_src);
+
+        assert_eq!(list.into_vec(), vec![1, 2, 3, 5, 6, 7]);
+        assert!(list_src.is_empty());
+    }
+
+    #[test]
+    fn list_split_off_should_work() {
+        let mut list = LinkedList::from([1, 3, 5, 7, 9]);
+        let mut split = list.split_off(3);
+
+        assert_eq!(list.front(), Some(&1));
+        assert_eq!(list.back(), Some(&5));
+
+        assert_eq!(split.pop_front(), Some(7));
+        assert_eq!(split.pop_front(), Some(9));
+        assert_eq!(split.pop_front(), None);
     }
 }

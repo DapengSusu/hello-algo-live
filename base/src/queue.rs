@@ -1,7 +1,6 @@
-use std::{
-    collections::LinkedList,
-    ops::{Deref, DerefMut},
-};
+use std::ops::{Deref, DerefMut};
+
+use crate::LinkedList;
 
 /// 基于链表实现的队列
 #[derive(Debug, Default, Clone)]
