@@ -1,5 +1,6 @@
 use std::{
     fmt::{self, Display},
+    hash::{Hash, Hasher},
     marker::PhantomData,
     mem,
     ptr::NonNull,
@@ -49,13 +50,13 @@ impl<T> LinkedList<T> {
     }
 
     /// 向链表头部插入一个元素
-    pub fn push_front(&mut self, t: T) {
-        self.push(t, true);
+    pub fn push_front(&mut self, elt: T) {
+        self.push(elt, true);
     }
 
     /// 向链表尾部插入一个元素
-    pub fn push_back(&mut self, t: T) {
-        self.push(t, false);
+    pub fn push_back(&mut self, elt: T) {
+        self.push(elt, false);
     }
 
     /// 移除链表头部元素并将其返回
@@ -92,6 +93,32 @@ impl<T> LinkedList<T> {
             .map(|node_ptr| unsafe { &mut (*node_ptr.as_ptr()).elem })
     }
 
+    /// 在指定位置插入一个元素
+    ///
+    /// # Panics
+    ///
+    /// Panics if `at > len`.
+    pub fn insert(&mut self, at: usize, elt: T) {
+        let len = self.len();
+
+        assert!(at <= len, "Cannot insert at a nonexistent index");
+        if at == 0 {
+            self.push_front(elt);
+            return;
+        } else if at == len {
+            self.push_back(elt);
+            return;
+        }
+
+        // 从 at 位置将链表分开
+        let mut rhs = self.split_off(at);
+
+        // 在分割后的新链表头部插入指定元素
+        rhs.push_front(elt);
+        // 两个链表重新合并
+        self.append(&mut rhs);
+    }
+
     /// 返回不可变迭代器
     pub fn iter(&self) -> Iter<'_, T> {
         Iter {
@@ -109,14 +136,14 @@ impl<T> LinkedList<T> {
     }
 
     /// 检查链表中是否包含指定元素，包含返回 true，否则返回 false
-    pub fn contains(&self, t: &T) -> bool
+    pub fn contains(&self, elt: &T) -> bool
     where
         T: PartialEq,
     {
         let mut current = self.head;
         while let Some(node_ptr) = current {
             unsafe {
-                if &(*node_ptr.as_ptr()).elem == t {
+                if &(*node_ptr.as_ptr()).elem == elt {
                     return true;
                 }
                 current = (*node_ptr.as_ptr()).next;
@@ -197,6 +224,7 @@ impl<T> LinkedList<T> {
     /// let mut split = list.split_off(2);
     ///
     /// assert_eq!(split, LinkedList::from([6, 8, 0]));
+    /// assert_eq!(list, LinkedList::from([2, 4]));
     /// ```
     pub fn split_off(&mut self, at: usize) -> LinkedList<T> {
         let len = self.len();
@@ -281,14 +309,14 @@ impl<T> LinkedList<T> {
     }
 
     /// 从前往后获取指定位置元素的不可变借用，如果 index 无效返回 None
-    pub fn get(&self, index: usize) -> Option<&T> {
-        self.get_node(index)
+    pub fn get(&self, at: usize) -> Option<&T> {
+        self.get_node(at)
             .map(|node_ptr| unsafe { &(*node_ptr.as_ptr()).elem })
     }
 
     /// 从前往后获取指定位置元素的可变借用，如果 index 无效返回 None
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
-        self.get_node(index)
+    pub fn get_mut(&mut self, at: usize) -> Option<&mut T> {
+        self.get_node(at)
             .map(|node_ptr| unsafe { &mut (*node_ptr.as_ptr()).elem })
     }
 
@@ -305,19 +333,19 @@ impl<T> LinkedList<T> {
 
 impl<T> LinkedList<T> {
     #[inline]
-    fn new_node(&self, t: T, is_front: bool) -> Option<NonNull<Node<T>>> {
+    fn new_node(&self, elt: T, is_front: bool) -> Option<NonNull<Node<T>>> {
         let node = Box::new(Node {
             prev: if is_front { None } else { self.tail },
             next: if is_front { self.head } else { None },
-            elem: t,
+            elem: elt,
         });
 
         Some(unsafe { NonNull::new_unchecked(Box::into_raw(node)) })
     }
 
     #[inline]
-    fn push(&mut self, t: T, is_front: bool) {
-        let node_ptr = self.new_node(t, is_front);
+    fn push(&mut self, elt: T, is_front: bool) {
+        let node_ptr = self.new_node(elt, is_front);
 
         if is_front {
             match self.head {
@@ -385,13 +413,13 @@ impl<T> LinkedList<T> {
     }
 
     #[inline]
-    fn get_node(&self, index: usize) -> Option<NonNull<Node<T>>> {
-        if index >= self.len {
+    fn get_node(&self, at: usize) -> Option<NonNull<Node<T>>> {
+        if at >= self.len {
             return None;
         }
 
         let mut current = self.head;
-        for _ in 0..index {
+        for _ in 0..at {
             // Safety: 这里的 index 一定在有效范围内
             let node_ptr = current.unwrap();
 
@@ -452,6 +480,20 @@ impl<T: PartialOrd> PartialOrd for LinkedList<T> {
 impl<T: Ord> Ord for LinkedList<T> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.iter().cmp(other)
+    }
+}
+
+impl<T: Hash> Hash for LinkedList<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.len.hash(state);
+
+        let mut current = self.head;
+        while let Some(node_ptr) = current {
+            let node = unsafe { node_ptr.as_ref() };
+
+            node.elem.hash(state);
+            current = node.next;
+        }
     }
 }
 
@@ -692,5 +734,18 @@ mod tests {
         assert_eq!(split.pop_front(), Some(7));
         assert_eq!(split.pop_front(), Some(9));
         assert_eq!(split.pop_front(), None);
+    }
+
+    #[test]
+    fn list_insert_should_work() {
+        let mut list = LinkedList::from([3, 4, 5, 6, 7]);
+
+        list.insert(3, 0);
+        assert_eq!(list.get(3), Some(&0));
+
+        list.insert(0, 1);
+        list.insert(7, 9);
+        assert_eq!(list.front(), Some(&1));
+        assert_eq!(list.back(), Some(&9));
     }
 }
