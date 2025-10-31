@@ -101,7 +101,7 @@ impl<T> LinkedList<T> {
     pub fn insert(&mut self, at: usize, elt: T) {
         let len = self.len();
 
-        assert!(at <= len, "Cannot insert at a nonexistent index");
+        assert!(at <= len, "Cannot insert at index: {at}, len: {len}");
         if at == 0 {
             self.push_front(elt);
             return;
@@ -117,6 +117,28 @@ impl<T> LinkedList<T> {
         rhs.push_front(elt);
         // 两个链表重新合并
         self.append(&mut rhs);
+    }
+
+    /// 删除指定位置的元素，并将其返回
+    ///
+    /// # Panics
+    ///
+    /// Panics if `at >= len`.
+    pub fn remove(&mut self, at: usize) -> Option<T> {
+        let len = self.len();
+
+        assert!(at < len, "Cannot remove at index: {at}, len: {len}");
+        if at == 0 {
+            return self.pop_front();
+        } else if at == len - 1 {
+            return self.pop_back();
+        }
+
+        let mut rhs = self.split_off(at);
+        let elem = rhs.pop_front();
+
+        self.append(&mut rhs);
+        elem
     }
 
     /// 返回不可变迭代器
@@ -276,6 +298,48 @@ impl<T> LinkedList<T> {
         } else {
             std::mem::take(self)
         }
+    }
+
+    /// 交换两个结点的值
+    ///
+    /// # Panics
+    ///
+    /// Panics if `i >= len` or `j` >= len.
+    pub fn swap(&mut self, i: usize, j: usize) {
+        let len = self.len();
+
+        assert!(i < len, "Cannot swap at index: {i}, len: {len}");
+        assert!(j < len, "Cannot swap at index: {j}, len: {len}");
+
+        if i == j {
+            return;
+        }
+
+        let (smaller_idx, larger_idx) = if i < j { (i, j) } else { (j, i) };
+        // Safety: 这里的 unwrap() 是安全的，链表至少存在两个元素且 i 和 j 都有效
+        let mut current = self.head.unwrap();
+
+        for _ in 0..smaller_idx {
+            // Safety: 同理，这里的 unwrap() 也是安全的
+            current = unsafe { current.as_ref().next.unwrap() };
+        }
+
+        let mut node_smaller_idx = current;
+        let mut node_larger_idx = current;
+
+        // 从较小索引处继续遍历
+        for _ in smaller_idx..larger_idx {
+            // Safety: 同理，这里的 unwrap() 也是安全的
+            node_larger_idx = unsafe { node_larger_idx.as_ref().next.unwrap() };
+        }
+
+        // Safety: 这里的修改是独占的，只是交换两个结点的元素值
+        unsafe {
+            mem::swap(
+                &mut node_smaller_idx.as_mut().elem,
+                &mut node_larger_idx.as_mut().elem,
+            )
+        };
     }
 
     /// 将链表转化为一个 Vec
@@ -724,7 +788,7 @@ mod tests {
     }
 
     #[test]
-    fn list_split_off_should_work() {
+    fn list_split_should_work() {
         let mut list = LinkedList::from([1, 3, 5, 7, 9]);
         let mut split = list.split_off(3);
 
@@ -747,5 +811,23 @@ mod tests {
         list.insert(7, 9);
         assert_eq!(list.front(), Some(&1));
         assert_eq!(list.back(), Some(&9));
+    }
+
+    #[test]
+    fn list_remove_should_work() {
+        let mut list = LinkedList::from([3, 4, 5, 6, 7]);
+
+        assert_eq!(list.remove(2), Some(5));
+        assert_eq!(list.remove(0), Some(3));
+        assert_eq!(list.remove(2), Some(7));
+        assert_eq!(list.len(), 2);
+    }
+
+    #[test]
+    fn list_swap_should_work() {
+        let mut list = LinkedList::from([1, 2, 3, 4, 5]);
+
+        list.swap(2, 4);
+        assert_eq!(list, LinkedList::from([1, 2, 5, 4, 3]));
     }
 }
