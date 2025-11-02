@@ -1,16 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["base"]
+members = ["base", "utils"]
 
 [workspace.package]
 edition = "2024"
 version = "0.1.0"
 authors = ["Jumper dapengsusu@qq.com"]
-license = "MIT OR Apache-2.0"
+license = "CC-BY-NC-SA-4.0"
 publish = false
-
-[workspace.dependencies]
-anyhow = "1"
-colored = "3"
-flexi_logger = "0.31"
-log = "0.4"

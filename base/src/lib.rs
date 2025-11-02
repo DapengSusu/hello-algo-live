@@ -1,5 +1,8 @@
-use colored::Colorize;
-use flexi_logger::Logger;
+mod binary_search_tree;
+pub use binary_search_tree::BinarySearchTree;
+
+mod binary_tree;
+pub use binary_tree::{BinaryTree, dfs};
 
 mod linked_list;
 pub use linked_list::LinkedList;
@@ -10,26 +13,5 @@ pub use queue::{QueueWithArray, QueueWithList};
 mod stack;
 pub use stack::{StackWithList, StackWithVec};
 
-pub fn init_logger(log_level: impl AsRef<str>) -> anyhow::Result<()> {
-    Logger::try_with_env_or_str(log_level)?
-        .format(|w, now, record| {
-            let level = match record.level() {
-                log::Level::Error => record.level().to_string().red(),
-                log::Level::Warn => record.level().to_string().yellow(),
-                log::Level::Info => record.level().to_string().green(),
-                log::Level::Debug => record.level().to_string().blue(),
-                log::Level::Trace => record.level().to_string().purple(),
-            };
-            write!(
-                w,
-                "[{}] {} [{}] {}",
-                now.format("%Y-%m-%d %H:%M:%S%.3f"),
-                level,
-                record.module_path().unwrap_or("<unnamed>"),
-                &record.args()
-            )
-        })
-        .start()?;
-
-    Ok(())
-}
+#[cfg(test)]
+mod tests {}

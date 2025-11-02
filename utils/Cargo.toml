@@ -1,5 +1,5 @@
 [package]
-name = "base"
+name = "utils"
 edition.workspace = true
 version.workspace = true
 authors.workspace = true
@@ -7,10 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-
-[dev-dependencies]
-criterion = "0.7"
-
-[[bench]]
-name = "binary_tree_benchmark"
-harness = false
+anyhow = "1"
+colored = "3"
+flexi_logger = "0.31"
+log = "0.4"
