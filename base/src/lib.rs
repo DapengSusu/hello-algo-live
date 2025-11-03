@@ -16,6 +16,9 @@ pub use queue::{QueueWithArray, QueueWithList};
 mod stack;
 pub use stack::{StackWithList, StackWithVec};
 
+mod top_k;
+pub use top_k::top_k_heap;
+
 pub mod bt {
     use std::collections::VecDeque;
 

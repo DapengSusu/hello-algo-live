@@ -122,14 +122,89 @@ fn sift_up_max<T: PartialOrd>(v: &mut [T], i: usize) {
     sift_up(v, i, |a, b| a <= b);
 }
 
-/// 小顶堆的从底至顶堆化
-fn sift_up_min<T: PartialOrd>(v: &mut [T], i: usize) {
-    sift_up(v, i, |a, b| a >= b);
-}
-
 /// 大顶堆的从顶至底堆化
 fn sift_down_max<T: PartialOrd>(v: &mut [T], i: usize) {
     sift_down(v, i, |a, b| a > b);
+}
+
+/// 小顶堆
+#[derive(Debug, Default)]
+pub struct MinHeap<T: PartialOrd>(Vec<T>);
+// 也可以使用 Reverse<T> 来简化实现
+// pub struct MinHeap<T: Ord>(Vec<Reverse<T>>);
+
+impl<T: PartialOrd> MinHeap<T> {
+    /// 创建一个空的 MinHeap
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+}
+
+impl<T: PartialOrd> Heap<T> for MinHeap<T> {
+    type HeapTp = MinHeap<T>;
+
+    fn from_vec<I>(v: I) -> Self::HeapTp
+    where
+        I: Into<Vec<T>>,
+    {
+        let mut heap = MinHeap(v.into());
+
+        for i in (0..=heap.len()).rev() {
+            sift_down_min(&mut heap.0, i);
+        }
+
+        heap
+    }
+
+    fn peek(&self) -> Option<&T> {
+        self.0.first()
+    }
+
+    fn push(&mut self, val: T) {
+        // 添加节点
+        self.0.push(val);
+        // 从底至顶堆化（heapity）
+        let len = self.len();
+        sift_up_min(&mut self.0, len - 1);
+    }
+
+    fn pop(&mut self) -> Option<T> {
+        if self.is_empty() {
+            return None;
+        }
+        // 交换删除堆顶元素和堆底元素（首元素和尾元素）
+        let val = self.0.swap_remove(0);
+
+        // 从顶至底堆化
+        sift_down_min(&mut self.0, 0);
+
+        Some(val)
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl<T: PartialOrd> From<Vec<T>> for MinHeap<T> {
+    fn from(v: Vec<T>) -> Self {
+        MinHeap::from_vec(v)
+    }
+}
+
+impl<T: PartialOrd, const N: usize> From<[T; N]> for MinHeap<T> {
+    fn from(v: [T; N]) -> Self {
+        MinHeap::from_vec::<[T; N]>(v)
+    }
+}
+
+/// 小顶堆的从底至顶堆化
+fn sift_up_min<T: PartialOrd>(v: &mut [T], i: usize) {
+    sift_up(v, i, |a, b| a >= b);
 }
 
 /// 小顶堆的从顶至底堆化
@@ -184,69 +259,6 @@ where
         v.swap(i, ext);
         // 循环向下堆化
         i = ext;
-    }
-}
-
-/// 小顶堆
-#[derive(Debug, Default)]
-pub struct MinHeap<T: Ord>(Vec<T>);
-// 也可以使用 Reverse<T> 来简化实现
-// pub struct MinHeap<T: Ord>(Vec<Reverse<T>>);
-
-impl<T: Ord> MinHeap<T> {
-    /// 创建一个空的 MinHeap
-    pub fn new() -> Self {
-        Self(Vec::new())
-    }
-}
-
-impl<T: Ord> Heap<T> for MinHeap<T> {
-    type HeapTp = MinHeap<T>;
-
-    fn from_vec<I>(v: I) -> Self::HeapTp
-    where
-        I: Into<Vec<T>>,
-    {
-        let mut heap = MinHeap(v.into());
-
-        for i in (0..=heap.len()).rev() {
-            sift_down_min(&mut heap.0, i);
-        }
-
-        heap
-    }
-
-    fn peek(&self) -> Option<&T> {
-        self.0.first()
-    }
-
-    fn push(&mut self, val: T) {
-        // 添加节点
-        self.0.push(val);
-        // 从底至顶堆化（heapity）
-        let len = self.len();
-        sift_up_min(&mut self.0, len - 1);
-    }
-
-    fn pop(&mut self) -> Option<T> {
-        if self.is_empty() {
-            return None;
-        }
-        // 交换删除堆顶元素和堆底元素（首元素和尾元素）
-        let val = self.0.swap_remove(0);
-
-        // 从顶至底堆化
-        sift_down_min(&mut self.0, 0);
-
-        Some(val)
-    }
-
-    fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    fn is_empty(&self) -> bool {
-        self.0.is_empty()
     }
 }
 
