@@ -63,7 +63,7 @@ impl<T> Default for AvlTree<T> {
     }
 }
 
-impl<T: Ord, const N: usize> From<[T; N]> for AvlTree<T> {
+impl<T: Ord + Clone, const N: usize> From<[T; N]> for AvlTree<T> {
     fn from(v: [T; N]) -> Self {
         let mut tree = AvlTree::new();
 
@@ -105,14 +105,18 @@ fn clone_tree<T: Clone>(node: &OptionNodeRc<T>) -> binary_tree::OptionNodeRc<T> 
     }
 }
 
-impl<T: Ord> AvlTree<T> {
+impl<T: Clone + Ord> AvlTree<T> {
     /// 插入节点
     pub fn insert(&mut self, val: T) {
         self.root = insert_recursive(self.root.clone(), val);
     }
-}
 
-impl<T: Clone + Ord> AvlTree<T> {
+    /// 删除节点
+    pub fn remove(&mut self, val: &T) {
+        self.root = remove_recursive(self.root.clone(), val);
+    }
+
+    /// 搜索指定值，返回对应值的节点
     pub fn search(&self, target: &T) -> OptionNodeRc<T> {
         let mut current = self.root.clone();
 
@@ -154,6 +158,56 @@ fn insert_recursive<T: Ord>(node: OptionNodeRc<T>, val: T) -> OptionNodeRc<T> {
             // 更新节点高度
             update_height(&node);
             // 执行旋转操作，使该节点重新恢复平衡
+            rotate(Some(node))
+        }
+    }
+}
+
+fn remove_recursive<T: Ord + Clone>(node: OptionNodeRc<T>, val: &T) -> OptionNodeRc<T> {
+    match node {
+        None => None,
+        Some(mut node) => {
+            if val < &node.borrow().value {
+                let left = node.borrow().left.clone();
+                {
+                    let left = remove_recursive(left, val);
+                    node.borrow_mut().left = left;
+                }
+            } else if val > &node.borrow().value {
+                let right = node.borrow().right.clone();
+                {
+                    let right = remove_recursive(right, val);
+                    node.borrow_mut().right = right;
+                }
+            } else if node.borrow().left.is_none() || node.borrow().right.is_none() {
+                let child = if node.borrow().left.is_some() {
+                    node.borrow().left.clone()
+                } else {
+                    node.borrow().right.clone()
+                };
+                match child {
+                    // 子节点数量为0，直接删除 nide 并返回
+                    None => {
+                        return None;
+                    }
+                    // 子节点数量为1，直接删除 nide
+                    Some(child) => node = child,
+                }
+            } else {
+                // 子节点数量为2，则将中序遍历的下个节点删除，并用该节点替换当前节点
+                let mut next = node.borrow().right.clone().unwrap();
+                loop {
+                    let next_left = next.borrow().left.clone();
+                    if next_left.is_none() {
+                        break;
+                    }
+                    next = next_left.unwrap();
+                }
+                let right = node.borrow().right.clone();
+                node.borrow_mut().right = remove_recursive(right, &next.borrow().value);
+                node.borrow_mut().value = next.borrow().value.clone();
+            }
+            update_height(&node);
             rotate(Some(node))
         }
     }
@@ -292,14 +346,23 @@ mod tests {
         avl_tree.insert(1);
         assert_eq!(avl_tree.search(&1).unwrap().borrow().value, 1);
 
-        avl_tree.insert(2);
-        assert_eq!(avl_tree.search(&2).unwrap().borrow().value, 2);
+        avl_tree.insert(3);
+        assert_eq!(avl_tree.search(&3).unwrap().borrow().value, 3);
+
+        avl_tree.insert(4);
+        avl_tree.insert(5);
+        avl_tree.insert(7);
+
+        avl_tree.remove(&1);
+        assert!(avl_tree.search(&1).is_none());
+
+        let tree = avl_tree.to_tree();
+        assert_eq!(tree.to_vec(), vec![3, 4, 5, 7]);
     }
 
     #[test]
     fn avl_convert_should_work() {
         let avl_tree = AvlTree::from([1, 3, 4, 5, 7]);
-        println!("{:#?}", avl_tree.root);
         let tree = avl_tree.to_tree();
 
         assert_eq!(tree.to_vec(), vec![1, 3, 4, 5, 7]);
