@@ -16,6 +16,14 @@
 #![allow(dead_code)]
 
 trait Heap<T> {
+    /// 关联大顶堆或小顶堆
+    type HeapTp;
+
+    /// 从列表中构建堆（建堆操作）
+    fn from_vec<I>(v: I) -> Self::HeapTp
+    where
+        I: Into<Vec<T>>;
+
     /// 获取堆顶元素（根节点）
     fn peek(&self) -> Option<&T>;
 
@@ -24,6 +32,12 @@ trait Heap<T> {
 
     /// 元素出堆
     fn pop(&mut self) -> Option<T>;
+
+    /// 堆中元素数量
+    fn len(&self) -> usize;
+
+    /// 判断堆是否为空
+    fn is_empty(&self) -> bool;
 }
 
 /// 大顶堆，使用 Vec 实现
@@ -31,32 +45,44 @@ trait Heap<T> {
 pub struct MaxHeap<T>(Vec<T>);
 
 impl<T: PartialOrd> MaxHeap<T> {
+    /// 创建一个空的 MaxHeap
     pub fn new() -> Self {
         Self(Vec::new())
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
     }
 }
 
 impl<T: PartialOrd> Heap<T> for MaxHeap<T> {
+    type HeapTp = MaxHeap<T>;
+
+    // 时间复杂度：O(n)
+    fn from_vec<I>(v: I) -> Self::HeapTp
+    where
+        I: Into<Vec<T>>,
+    {
+        // 将列表元素直接放进堆中
+        let mut heap = MaxHeap(v.into());
+        // 堆化除叶节点外的其它节点
+        for i in (0..=parent(heap.len() - 1)).rev() {
+            sift_down_max(&mut heap.0, i);
+        }
+
+        heap
+    }
+
     fn peek(&self) -> Option<&T> {
         self.0.first()
     }
 
+    // 时间复杂度：O(logn)
     fn push(&mut self, val: T) {
         // 添加节点
         self.0.push(val);
         // 从底至顶堆化（heapity）
         let len = self.len();
-        sift_up(&mut self.0, len - 1, |a, b| a <= b);
+        sift_up_max(&mut self.0, len - 1);
     }
 
+    // 时间复杂度：O(logn)
     fn pop(&mut self) -> Option<T> {
         if self.is_empty() {
             return None;
@@ -65,25 +91,53 @@ impl<T: PartialOrd> Heap<T> for MaxHeap<T> {
         let val = self.0.swap_remove(0);
 
         // 从顶至底堆化
-        sift_down(&mut self.0, 0, |a, b| a > b);
+        sift_down_max(&mut self.0, 0);
 
         Some(val)
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl<T: PartialOrd> From<Vec<T>> for MaxHeap<T> {
+    fn from(v: Vec<T>) -> Self {
+        MaxHeap::from_vec(v)
     }
 }
 
 impl<T: PartialOrd, const N: usize> From<[T; N]> for MaxHeap<T> {
     fn from(v: [T; N]) -> Self {
-        let mut heap = MaxHeap::new();
-
-        v.into_iter().for_each(|val| {
-            heap.push(val);
-        });
-
-        heap
+        MaxHeap::from_vec::<[T; N]>(v)
     }
 }
 
-// 从节点 i 开始，从底至顶堆化
+/// 大顶堆的从底至顶堆化
+fn sift_up_max<T: PartialOrd>(v: &mut [T], i: usize) {
+    sift_up(v, i, |a, b| a <= b);
+}
+
+/// 小顶堆的从底至顶堆化
+fn sift_up_min<T: PartialOrd>(v: &mut [T], i: usize) {
+    sift_up(v, i, |a, b| a >= b);
+}
+
+/// 大顶堆的从顶至底堆化
+fn sift_down_max<T: PartialOrd>(v: &mut [T], i: usize) {
+    sift_down(v, i, |a, b| a > b);
+}
+
+/// 小顶堆的从顶至底堆化
+fn sift_down_min<T: PartialOrd>(v: &mut [T], i: usize) {
+    sift_down(v, i, |a, b| a < b);
+}
+
+/// 从节点 i 开始，从底至顶堆化
 fn sift_up<T, F>(v: &mut [T], mut i: usize, cmp: F)
 where
     T: PartialOrd,
@@ -107,7 +161,7 @@ where
     }
 }
 
-// 从节点 i 开始，从顶至底堆化
+/// 从节点 i 开始，从顶至底堆化
 fn sift_down<T, F>(v: &mut [T], mut i: usize, cmp: F)
 where
     T: PartialOrd,
@@ -140,20 +194,28 @@ pub struct MinHeap<T: Ord>(Vec<T>);
 // pub struct MinHeap<T: Ord>(Vec<Reverse<T>>);
 
 impl<T: Ord> MinHeap<T> {
+    /// 创建一个空的 MinHeap
     pub fn new() -> Self {
         Self(Vec::new())
-    }
-
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
     }
 }
 
 impl<T: Ord> Heap<T> for MinHeap<T> {
+    type HeapTp = MinHeap<T>;
+
+    fn from_vec<I>(v: I) -> Self::HeapTp
+    where
+        I: Into<Vec<T>>,
+    {
+        let mut heap = MinHeap(v.into());
+
+        for i in (0..=heap.len()).rev() {
+            sift_down_min(&mut heap.0, i);
+        }
+
+        heap
+    }
+
     fn peek(&self) -> Option<&T> {
         self.0.first()
     }
@@ -163,7 +225,7 @@ impl<T: Ord> Heap<T> for MinHeap<T> {
         self.0.push(val);
         // 从底至顶堆化（heapity）
         let len = self.len();
-        sift_up(&mut self.0, len - 1, |a, b| a >= b);
+        sift_up_min(&mut self.0, len - 1);
     }
 
     fn pop(&mut self) -> Option<T> {
@@ -174,9 +236,17 @@ impl<T: Ord> Heap<T> for MinHeap<T> {
         let val = self.0.swap_remove(0);
 
         // 从顶至底堆化
-        sift_down(&mut self.0, 0, |a, b| a < b);
+        sift_down_min(&mut self.0, 0);
 
         Some(val)
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 
@@ -237,18 +307,6 @@ mod tests {
     }
 
     #[test]
-    fn max_heap_from_vec_should_work() {
-        let mut heap = MaxHeap::from([1, 2, 5, 3, 4]);
-
-        assert_eq!(heap.pop(), Some(5));
-        assert_eq!(heap.pop(), Some(4));
-        assert_eq!(heap.pop(), Some(3));
-        assert_eq!(heap.pop(), Some(2));
-        assert_eq!(heap.pop(), Some(1));
-        assert_eq!(heap.pop(), None);
-    }
-
-    #[test]
     fn min_heap_basics_should_work() {
         let mut heep = MinHeap::new();
 
@@ -272,5 +330,21 @@ mod tests {
         assert_eq!(heep.pop(), Some(4));
         assert_eq!(heep.pop(), Some(5));
         assert_eq!(heep.pop(), None);
+    }
+
+    #[test]
+    fn heap_from_vec_should_work() {
+        let mut min_heap = MinHeap::from_vec([1, 2, 5, 3, 4, 2]);
+        // MaxHeap 实现了 From trait
+        let mut max_heap = MaxHeap::from([1, 2, 5, 3, 4, 2]);
+
+        assert_eq!(min_heap.peek(), Some(&1));
+        assert_eq!(max_heap.peek(), Some(&5));
+
+        assert_eq!(min_heap.pop(), Some(1));
+        assert_eq!(max_heap.pop(), Some(5));
+
+        assert_eq!(min_heap.peek(), Some(&2));
+        assert_eq!(max_heap.peek(), Some(&4));
     }
 }
