@@ -213,8 +213,8 @@ fn remove_recursive<T: Ord + Clone>(node: OptionNodeRc<T>, val: &T) -> OptionNod
     }
 }
 
-// 获取节点高度
-fn height<T>(node: &OptionNodeRc<T>) -> i32 {
+/// 获取节点高度
+pub fn height<T>(node: &OptionNodeRc<T>) -> i32 {
     match node {
         // 叶节点高度为0，空节点高度为-1
         Some(node) => node.borrow().height,

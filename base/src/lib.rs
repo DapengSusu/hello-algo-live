@@ -4,6 +4,9 @@ pub use avl_tree::AvlTree;
 mod binary_tree;
 pub use binary_tree::{BinarySearchTree, BinaryTree};
 
+mod heap;
+pub use heap::{MaxHeap, MinHeap};
+
 mod linked_list;
 pub use linked_list::LinkedList;
 
